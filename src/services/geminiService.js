@@ -17,10 +17,10 @@ export class GeminiService {
       if (saved && saved.trim().length > 10) return saved.trim();
     } catch (e) {}
 
-    // 2. Variable d'environnement Vite (.env)
+    // 2. Clé injectée globalement dans la session locale
     try {
-      const viteKey = import.meta.env ? (import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_GOOGLE_API_KEY) : null;
-      if (viteKey && viteKey.trim().length > 10) return viteKey.trim();
+      const globalKey = typeof window !== 'undefined' ? (window.__GEMINI_KEY__ || window.GEMINI_API_KEY) : null;
+      if (globalKey && globalKey.trim().length > 10) return globalKey.trim();
     } catch (e) {}
 
     return '';
