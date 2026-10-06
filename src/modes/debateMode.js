@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { geminiService } from '../services/geminiService.js';
 import { sounds } from '../audio/soundEffects.js';
 import { createClayMaterial, CLAY_PALETTE } from '../materials/clayMaterial.js';
+import { loadCharacterModel } from '../loaders/universalModelLoader.js';
 
 export class DebateMode {
   constructor(charA, charB, uiCallbacks) {
@@ -132,6 +133,26 @@ export class DebateMode {
     }
 
     this.sceneGroup.add(menhirGroup);
+
+    // 4. Décor officiel du village gaulois (000.dae)
+    const baseUrl = import.meta.env?.BASE_URL || './';
+    const cleanBase = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/';
+    const envFolder = `${cleanBase}models/environnement`;
+
+    loadCharacterModel(envFolder, '000.dae', {
+      isEnvironment: true,
+      targetHeight: 14.0
+    })
+      .then((envModel) => {
+        envModel.name = 'GaulVillageEnvironment';
+        envModel.position.set(0, -0.05, -7.5);
+        envModel.rotation.y = Math.PI * 0.15;
+        this.sceneGroup.add(envModel);
+        this.villageEnv = envModel;
+      })
+      .catch((err) => {
+        console.warn('[DEBATE-ENV] Décor environnement 000.dae:', err.message);
+      });
   }
 
   enter() {

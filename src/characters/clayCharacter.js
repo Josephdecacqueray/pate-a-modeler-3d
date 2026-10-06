@@ -1,7 +1,5 @@
 import * as THREE from 'three';
-import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
-import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
-import { generateClayTextures } from '../materials/clayMaterial.js';
+import { loadCharacterModel } from '../loaders/universalModelLoader.js';
 
 export class ClayCharacter {
   /**
@@ -32,10 +30,14 @@ export class ClayCharacter {
     this.currentScaleXZ = 1.0;
     this.currentPosY = 0.0;
     this.currentRotX = 0.0;
+    this.currentRotY = 0.0;
+    this.currentRotZ = 0.0;
+
     // Ancre pour la tête / projection des bulles de dialogue BD
+    const isObelix = (id === 'B');
     this.head = new THREE.Group();
     this.head.name = `HeadAnchor_${id}`;
-    this.head.position.y = (id === 'A' ? 1.75 : 2.25);
+    this.head.position.y = isObelix ? 2.40 : 1.85;
     this.modelRoot.add(this.head);
 
     this.isLoaded = false;
@@ -49,110 +51,51 @@ export class ClayCharacter {
       this.head.getWorldPosition(targetVec3);
     } else {
       this.group.getWorldPosition(targetVec3);
-      targetVec3.y += (this.id === 'A' ? 1.75 : 2.25);
+      targetVec3.y += (this.id === 'A' ? 1.85 : 2.40);
     }
     return targetVec3;
   }
 
   /**
-   * Chargement, normalisation Box3 et centrage sur le terrain (base à y = 0)
+   * Chargement universel polymorphe, normalisation Box3 et centrage sur le terrain (base à y = 0)
    */
   _load3DModel() {
-    const isA = (this.id === 'A');
-    const folder = isA ? 'asterix' : 'obelix';
-    const mtlFile = isA ? 'Asterix.mtl' : 'Obelix.mtl';
-    const objFile = isA ? 'Asterix.obj' : 'Obelix.obj';
+    const isObelix = (this.id === 'B');
+    const folder = isObelix ? 'models/obelix' : 'models/asterix';
+    const baseName = isObelix ? 'Obelix' : 'Asterix';
 
     // Résolution du chemin absolu/relatif selon l'environnement Vite
     const baseUrl = import.meta.env?.BASE_URL || './';
     const cleanBase = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/';
-    const modelPath = `${cleanBase}models/${folder}/`;
+    const modelFolder = `${cleanBase}${folder}`;
 
-    const mtlLoader = new MTLLoader();
-    mtlLoader.setPath(modelPath);
-
-    mtlLoader.load(
-      mtlFile,
-      (materials) => {
-        materials.preload();
-
-        const objLoader = new OBJLoader();
-        objLoader.setMaterials(materials);
-        objLoader.setPath(modelPath);
-
-        objLoader.load(
-          objFile,
-          (object) => {
-            this._setupLoadedModel(object);
-          },
-          undefined,
-          (err) => {
-            console.warn(`[3D-LOADER] Échec OBJ pour ${this.name}, fallback procédural:`, err.message);
-            this._setupProceduralFallback();
-          }
-        );
-      },
-      undefined,
-      (err) => {
-        console.warn(`[3D-LOADER] Échec MTL pour ${this.name}, fallback procédural:`, err.message);
+    loadCharacterModel(modelFolder, baseName, {
+      isObelix,
+      targetHeight: isObelix ? 2.45 : 1.9
+    })
+      .then((object) => {
+        this._setupLoadedModel(object);
+      })
+      .catch((err) => {
+        console.warn(`[3D-LOADER] Échec polymorphe pour ${this.name}, fallback procédural:`, err.message);
         this._setupProceduralFallback();
-      }
-    );
+      });
   }
 
   _setupLoadedModel(object) {
-    // Calcul de la boîte englobante Box3 pour normalisation
-    const box = new THREE.Box3().setFromObject(object);
-    const size = box.getSize(new THREE.Vector3());
-
-    // Hauteur homogène demandée (~2 unités : Astérix ~1.85u, Obélix ~2.25u)
-    const targetHeight = (this.id === 'A') ? 1.85 : 2.25;
-    const scaleFactor = targetHeight / (size.y || 1);
-    object.scale.setScalar(scaleFactor);
-
-    // Recalcul de la boîte après mise à l'échelle
-    box.setFromObject(object);
-    const scaledMin = box.min;
-    const scaledCenter = box.getCenter(new THREE.Vector3());
-
-    // Alignement rigoureux : base à y = 0, centré sur X et Z
-    object.position.x = -scaledCenter.x;
-    object.position.z = -scaledCenter.z;
-    object.position.y = -scaledMin.y;
-
-    // Shaders et textures d'argile (texture originale + bump d'empreintes)
-    const { bumpMap, normalMap } = generateClayTextures();
-
-    object.traverse((child) => {
-      if (child.isMesh) {
-        child.castShadow = true;
-        child.receiveShadow = true;
-
-        if (child.material) {
-          const mats = Array.isArray(child.material) ? child.material : [child.material];
-          mats.forEach((mat) => {
-            mat.roughness = 0.85;
-            mat.metalness = 0.03;
-            mat.bumpMap = bumpMap;
-            mat.bumpScale = 0.02;
-            mat.normalMap = normalMap;
-            mat.normalScale = new THREE.Vector2(0.2, 0.2);
-            if (mat.map) {
-              mat.map.colorSpace = THREE.SRGBColorSpace;
-            }
-            mat.needsUpdate = true;
-          });
-        }
-      }
-    });
-
     // Nettoyage de l'éventuel fallback temporaire
     while (this.modelRoot.children.length > 0) {
-      this.modelRoot.remove(this.modelRoot.children[0]);
+      const child = this.modelRoot.children[0];
+      if (child === this.head) break;
+      this.modelRoot.remove(child);
     }
 
     this.modelMesh = object;
     this.modelRoot.add(object);
+    // Assurer que l'ancre de tête reste attachée
+    if (!this.modelRoot.children.includes(this.head)) {
+      this.modelRoot.add(this.head);
+    }
     this.isLoaded = true;
   }
 
