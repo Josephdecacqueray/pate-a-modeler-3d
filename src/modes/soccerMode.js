@@ -386,7 +386,12 @@ export class SoccerMode {
     const isBallInMyZone = (teamSide < 0 ? ballPos.x < 1.4 : ballPos.x > -1.4);
 
     if (isBallInMyZone) {
-      character.group.lookAt(ballPos.x, charPos.y, ballPos.z);
+      // Pivot en douceur vers le ballon
+      const targetAngle = Math.atan2(ballPos.x - charPos.x, ballPos.z - charPos.z);
+      let diff = (targetAngle - character.group.rotation.y) % (Math.PI * 2);
+      if (diff < -Math.PI) diff += Math.PI * 2;
+      if (diff > Math.PI) diff -= Math.PI * 2;
+      character.group.rotation.y += diff * Math.min(1.0, 7.5 * delta);
 
       if (distToBall > 0.95) {
         character.setAction('run');
@@ -405,6 +410,24 @@ export class SoccerMode {
           new CANNON.Vec3(kickDir.x * kickPower, 3.4, kickDir.z * kickPower),
           this.ballBody.position
         );
+
+        // Réaction en direct sur frappe puissante (avec temporisation de confort)
+        const now = Date.now();
+        if (!this.lastKickReactionTime || (now - this.lastKickReactionTime > 7500)) {
+          this.lastKickReactionTime = now;
+          geminiService.generateSoccerReaction(`Frappe puissante vers les cages`, character.name)
+            .then(comment => {
+              if (teamSide < 0) {
+                if (this.uiCallbacks.showBubbleA) this.uiCallbacks.showBubbleA(comment);
+              } else {
+                if (this.uiCallbacks.showBubbleB) this.uiCallbacks.showBubbleB(comment);
+              }
+              setTimeout(() => {
+                if (this.uiCallbacks.hideBubbles) this.uiCallbacks.hideBubbles();
+              }, 2600);
+            })
+            .catch(() => {});
+        }
       }
     } else {
       const homeX = teamSide * 2.8;

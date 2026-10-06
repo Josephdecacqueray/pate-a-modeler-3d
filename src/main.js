@@ -304,8 +304,15 @@ class ClayGameApp {
     const updateBubblePos = (char, bubbleElem) => {
       if (!bubbleElem || bubbleElem.style.display === 'none') return;
       const headWorldPos = new THREE.Vector3();
-      char.head.getWorldPosition(headWorldPos);
-      headWorldPos.y += 0.82;
+      if (char.getHeadWorldPosition) {
+        char.getHeadWorldPosition(headWorldPos);
+      } else if (char.head) {
+        char.head.getWorldPosition(headWorldPos);
+      } else {
+        char.group.getWorldPosition(headWorldPos);
+        headWorldPos.y += (char.id === 'A' ? 1.85 : 2.25);
+      }
+      headWorldPos.y += 0.55;
 
       const screenPos = headWorldPos.project(this.camera);
       const x = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
@@ -682,5 +689,5 @@ class ClayGameApp {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  new ClayGameApp();
+  window.app = new ClayGameApp();
 });
