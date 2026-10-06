@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { createClayMaterial, CLAY_PALETTE } from '../materials/clayMaterial.js';
 import { sounds } from '../audio/soundEffects.js';
+import { geminiService } from '../services/geminiService.js';
 
 export class SoccerMode {
   constructor(charA, charB, uiCallbacks, camera, domElement) {
@@ -327,6 +328,20 @@ export class SoccerMode {
       this.uiCallbacks.onGoalBanner(`⚽ BUUUUT DE ${scorerName.toUpperCase()} ! 🎉`);
     }
 
+    // Réplique comique générée en direct par l'API Gemini selon le bonhomme
+    geminiService.generateSoccerReaction(`BUUUUT magistral de ${scorerName} !`, scorerName)
+      .then(reaction => {
+        if (team === 'A') {
+          if (this.uiCallbacks.showBubbleA) this.uiCallbacks.showBubbleA(reaction);
+        } else {
+          if (this.uiCallbacks.showBubbleB) this.uiCallbacks.showBubbleB(reaction);
+        }
+        setTimeout(() => {
+          if (this.uiCallbacks.hideBubbles) this.uiCallbacks.hideBubbles();
+        }, 3200);
+      })
+      .catch(() => {});
+
     // Remise en jeu automatique au centre
     setTimeout(() => {
       this.resetBall();
@@ -335,7 +350,7 @@ export class SoccerMode {
       if (this.uiCallbacks.hideGoalBanner) {
         this.uiCallbacks.hideGoalBanner();
       }
-    }, 2800);
+    }, 3200);
   }
 
   update(delta) {

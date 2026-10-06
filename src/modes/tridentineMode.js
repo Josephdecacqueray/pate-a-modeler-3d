@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { createClayMaterial, CLAY_PALETTE } from '../materials/clayMaterial.js';
 import { sounds } from '../audio/soundEffects.js';
+import { geminiService } from '../services/geminiService.js';
 
 export const TRIDENTINE_LITURGY = [
   {
@@ -281,6 +282,40 @@ export class TridentineMode {
 
   ringBell() {
     sounds.playChurchBell();
+  }
+
+  async generateCustomPrayer() {
+    if (this.uiCallbacks.onTridentineStep) {
+      this.uiCallbacks.onTridentineStep({
+        latin: "Invocatio ad Deum in cursu...",
+        french: "Génération de l'oraison solennelle en direct avec Gemini...",
+        speaker: "Méditation en direct (IA)",
+        posture: 'incurvatio'
+      }, this.currentStep + 1, TRIDENTINE_LITURGY.length);
+    }
+    this.charA.setAction('incurvatio');
+    this.charB.setAction('incurvatio');
+
+    try {
+      const text = await geminiService.generatePrayerText('tridentine', 'Astériclos');
+      const lines = text.split('\n').filter(l => l.trim().length > 0);
+      const latin = lines[0] || text;
+      const french = lines[1] || "Que la grâce du Seigneur demeure toujours avec vous.";
+
+      if (this.uiCallbacks.onTridentineStep) {
+        this.uiCallbacks.onTridentineStep({
+          latin: latin,
+          french: french,
+          speaker: "Oraison Liturgique (Direct Gemini)",
+          posture: 'manibusIunctis'
+        }, this.currentStep + 1, TRIDENTINE_LITURGY.length);
+      }
+      this.charA.setAction('manibusIunctis');
+      this.charB.setAction('manibusIunctis');
+      sounds.playChurchBell();
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   update(delta, totalTime) {

@@ -25,7 +25,7 @@ async function main() {
   run('git config user.email "josephdecacqueray@users.noreply.github.com"');
   run('git add .');
   try {
-    run('git commit -m "Initial release: Astérix & Obélix 3D Claymation SPA"');
+    run('git commit -m "Feat: Refined clay sculpture anatomy, authentic Domaine des Dieux characters, live Gemini API integration"');
   } catch (e) {
     console.log('Commit already exists or nothing to commit.');
   }

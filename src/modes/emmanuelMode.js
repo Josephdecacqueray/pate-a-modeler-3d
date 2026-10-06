@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { createClayMaterial, CLAY_PALETTE } from '../materials/clayMaterial.js';
 import { sounds } from '../audio/soundEffects.js';
+import { geminiService } from '../services/geminiService.js';
 
 export const EMMANUEL_CHORUSES = [
   {
@@ -270,6 +271,36 @@ export class EmmanuelMode {
 
   triggerChord() {
     sounds.playPraiseChord();
+  }
+
+  async generateCustomPraise() {
+    if (this.uiCallbacks.onEmmanuelChorus) {
+      this.uiCallbacks.onEmmanuelChorus({
+        refrain: "Écoute l'Esprit...",
+        subtext: "Génération de l'acclamation de louange en direct avec Gemini...",
+        posture: 'orans',
+        leadSpeaker: "Louange en direct (IA)"
+      }, this.currentStep + 1, EMMANUEL_CHORUSES.length);
+    }
+    this.charA.setAction('orans');
+    this.charB.setAction('orans');
+
+    try {
+      const text = await geminiService.generatePrayerText('emmanuel', 'Obélicon');
+      if (this.uiCallbacks.onEmmanuelChorus) {
+        this.uiCallbacks.onEmmanuelChorus({
+          refrain: text,
+          subtext: "Alléluia ! Acclamez le Seigneur de tout votre cœur !",
+          posture: 'clap',
+          leadSpeaker: "Acclamation Spontanée (Direct Gemini)"
+        }, this.currentStep + 1, EMMANUEL_CHORUSES.length);
+      }
+      this.charA.setAction('clap');
+      this.charB.setAction('clap');
+      sounds.playPraiseChord();
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   update(delta, totalTime) {

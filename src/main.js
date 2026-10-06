@@ -59,18 +59,14 @@ class ClayGameApp {
     // 6. Sol modelé en argile
     this._setupGround();
 
-    // 7. Personnages anatomiques gaulois sculptés
+    // 7. Personnages anatomiques gaulois sculptés (Fidèles au Domaine des Dieux)
     this.charA = new ClayCharacter('A', {
       name: 'Astériclos',
-      tunicColor: CLAY_PALETTE.gauloisBlue,
-      mustacheColor: CLAY_PALETTE.mustacheRed,
-      scale: 0.98
+      scale: 0.95
     });
     this.charB = new ClayCharacter('B', {
       name: 'Obélicon',
-      tunicColor: CLAY_PALETTE.tunicWhite,
-      mustacheColor: CLAY_PALETTE.mustacheBlonde,
-      scale: 1.22
+      scale: 1.28
     });
     this.scene.add(this.charA.group);
     this.scene.add(this.charB.group);
@@ -121,7 +117,8 @@ class ClayGameApp {
     this.dirLight.shadow.camera.right = 7;
     this.dirLight.shadow.camera.top = 7;
     this.dirLight.shadow.camera.bottom = -7;
-    this.dirLight.shadow.bias = -0.0004;
+    this.dirLight.shadow.bias = -0.0001;
+    this.dirLight.shadow.normalBias = 0.04;
     this.scene.add(this.dirLight);
 
     this.rimLight = new THREE.DirectionalLight(0xff8c42, 1.1);
@@ -130,12 +127,66 @@ class ClayGameApp {
   }
 
   _setupGround() {
-    const groundGeom = new THREE.CylinderGeometry(9.0, 9.5, 0.45, 40);
-    const groundMat = createClayMaterial(CLAY_PALETTE.turfGreen, { roughness: 0.85 });
+    const radius = 9.8;
+    const radialSegs = 64;
+    const heightSegs = 16;
+    const groundGeom = new THREE.CylinderGeometry(radius, radius * 1.05, 0.55, radialSegs, heightSegs);
+
+    // Déformation procédurale du sol en pâte à modeler verte (bosses douces et vallonnements)
+    const pos = groundGeom.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const y = pos.getY(i);
+      if (y > 0.1) {
+        const x = pos.getX(i);
+        const z = pos.getZ(i);
+        const wave1 = Math.sin(x * 0.65) * Math.cos(z * 0.65) * 0.12;
+        const wave2 = Math.sin(x * 1.4 + z * 1.1) * 0.05;
+        const distFromCenter = Math.sqrt(x * x + z * z);
+        const centerFlatten = Math.min(1.0, Math.max(0.0, (distFromCenter - 1.5) / 2.5));
+        pos.setY(i, y + (wave1 + wave2) * centerFlatten);
+      }
+    }
+    groundGeom.computeVertexNormals();
+
+    const groundMat = createClayMaterial(CLAY_PALETTE.turfGreen, {
+      roughness: 0.88,
+      bumpScale: 0.05
+    });
+
     this.groundMesh = new THREE.Mesh(groundGeom, groundMat);
-    this.groundMesh.position.y = -0.22;
+    this.groundMesh.position.y = -0.28;
     this.groundMesh.receiveShadow = true;
     this.scene.add(this.groundMesh);
+
+    // Brins d'herbe stylisés en pâte à modeler verte dispersés sur le pourtour
+    const grassGroup = new THREE.Group();
+    const matGrass = createClayMaterial(CLAY_PALETTE.turfGreenDark, { roughness: 0.86 });
+
+    const numTufts = 42;
+    for (let g = 0; g < numTufts; g++) {
+      const angle = (g / numTufts) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
+      const dist = 2.2 + Math.random() * 6.2;
+      const gx = Math.cos(angle) * dist;
+      const gz = Math.sin(angle) * dist;
+
+      const tuft = new THREE.Group();
+      tuft.position.set(gx, 0.02, gz);
+
+      const blades = 3 + Math.floor(Math.random() * 3);
+      for (let b = 0; b < blades; b++) {
+        const bladeH = 0.12 + Math.random() * 0.15;
+        const bladeGeom = new THREE.ConeGeometry(0.035, bladeH, 6);
+        const blade = new THREE.Mesh(bladeGeom, matGrass);
+        blade.position.set((b - 1) * 0.04, bladeH * 0.5, (Math.random() - 0.5) * 0.04);
+        blade.rotation.z = (Math.random() - 0.5) * 0.4;
+        blade.rotation.x = (Math.random() - 0.5) * 0.4;
+        blade.castShadow = true;
+        blade.receiveShadow = true;
+        tuft.add(blade);
+      }
+      grassGroup.add(tuft);
+    }
+    this.scene.add(grassGroup);
   }
 
   _setupPostProcessing() {
@@ -280,27 +331,35 @@ class ClayGameApp {
         if (!bubbleA) return;
         bubbleA.querySelector('.bubble-text').textContent = text;
         bubbleA.style.display = 'block';
+        bubbleA.classList.add('visible');
         bubbleA.classList.remove('pop-anim');
         void bubbleA.offsetWidth;
         bubbleA.classList.add('pop-anim');
       },
       hideBubbleA: () => {
-        if (bubbleA) bubbleA.style.display = 'none';
+        if (bubbleA) {
+          bubbleA.style.display = 'none';
+          bubbleA.classList.remove('visible');
+        }
       },
       showBubbleB: (text) => {
         if (!bubbleB) return;
         bubbleB.querySelector('.bubble-text').textContent = text;
         bubbleB.style.display = 'block';
+        bubbleB.classList.add('visible');
         bubbleB.classList.remove('pop-anim');
         void bubbleB.offsetWidth;
         bubbleB.classList.add('pop-anim');
       },
       hideBubbleB: () => {
-        if (bubbleB) bubbleB.style.display = 'none';
+        if (bubbleB) {
+          bubbleB.style.display = 'none';
+          bubbleB.classList.remove('visible');
+        }
       },
       hideBubbles: () => {
-        if (bubbleA) bubbleA.style.display = 'none';
-        if (bubbleB) bubbleB.style.display = 'none';
+        if (bubbleA) { bubbleA.style.display = 'none'; bubbleA.classList.remove('visible'); }
+        if (bubbleB) { bubbleB.style.display = 'none'; bubbleB.classList.remove('visible'); }
       },
       onDebateStatus: (msg, isThinking) => {
         if (statusElem) {
@@ -515,12 +574,14 @@ class ClayGameApp {
     // Mode Tridentin
     const triNextBtn = document.getElementById('btn-tri-next');
     const triPrevBtn = document.getElementById('btn-tri-prev');
+    const triAiBtn = document.getElementById('btn-tri-ai');
     const triBellBtn = document.getElementById('btn-tri-bell');
     const triGenuflectBtn = document.getElementById('btn-tri-genuflect');
     const triBowBtn = document.getElementById('btn-tri-bow');
 
     if (triNextBtn) triNextBtn.addEventListener('click', () => this.modes.tridentine.nextStep());
     if (triPrevBtn) triPrevBtn.addEventListener('click', () => this.modes.tridentine.prevStep());
+    if (triAiBtn) triAiBtn.addEventListener('click', () => this.modes.tridentine.generateCustomPrayer());
     if (triBellBtn) triBellBtn.addEventListener('click', () => this.modes.tridentine.ringBell());
     if (triGenuflectBtn) triGenuflectBtn.addEventListener('click', () => this.modes.tridentine.setManualPosture('genuflect'));
     if (triBowBtn) triBowBtn.addEventListener('click', () => this.modes.tridentine.setManualPosture('incurvatio'));
@@ -528,12 +589,14 @@ class ClayGameApp {
     // Mode Emmanuel
     const emmaNextBtn = document.getElementById('btn-emma-next');
     const emmaPrevBtn = document.getElementById('btn-emma-prev');
+    const emmaAiBtn = document.getElementById('btn-emma-ai');
     const emmaOransBtn = document.getElementById('btn-emma-orans');
     const emmaClapBtn = document.getElementById('btn-emma-clap');
     const emmaDanceBtn = document.getElementById('btn-emma-dance');
 
     if (emmaNextBtn) emmaNextBtn.addEventListener('click', () => this.modes.emmanuel.nextStep());
     if (emmaPrevBtn) emmaPrevBtn.addEventListener('click', () => this.modes.emmanuel.prevStep());
+    if (emmaAiBtn) emmaAiBtn.addEventListener('click', () => this.modes.emmanuel.generateCustomPraise());
     if (emmaOransBtn) emmaOransBtn.addEventListener('click', () => this.modes.emmanuel.setPosture('orans'));
     if (emmaClapBtn) emmaClapBtn.addEventListener('click', () => this.modes.emmanuel.setPosture('clap'));
     if (emmaDanceBtn) emmaDanceBtn.addEventListener('click', () => this.modes.emmanuel.setPosture('celebrate'));
